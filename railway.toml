@@ -1,0 +1,12 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "npm run production"
+healthcheckPath = "/"
+healthcheckTimeout = 300
+restartPolicyType = "never"
+
+[environments]
+[environments.production]
+startCommand = "npm run production"
