@@ -8,7 +8,12 @@
     "dev": "node index.js",
     "production": "node index.js"
   },
-  "keywords": ["restaurant", "api", "nodejs", "express"],
+  "keywords": [
+    "restaurant",
+    "api",
+    "nodejs",
+    "express"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
