@@ -6,6 +6,21 @@ const cron = require("node-cron");
 // Load environment variables
 require('dotenv').config({ path: __dirname + '/.env' });
 
+// Check for required environment variables
+if (!process.env.JWT_SECRET) {
+  console.error("❌ JWT_SECRET is missing from environment variables!");
+  console.log("Please create a .env file with JWT_SECRET");
+  process.exit(1);
+}
+
+if (!process.env.MONGO_URI) {
+  console.error("❌ MONGO_URI is missing from environment variables!");
+  console.log("Please create a .env file with MONGO_URI");
+  process.exit(1);
+}
+
+console.log("✅ Environment variables loaded successfully");
+
 const fetch = require("node-fetch"); // npm install node-fetch
 
 const app = express();
@@ -14,6 +29,16 @@ const PORT = process.env.PORT || 3000;
 // Example /health route
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok" });
+});
+
+// Test authentication route
+app.get("/test-auth", (req, res) => {
+  res.json({ 
+    message: "Authentication system is working",
+    hasJWTSecret: !!process.env.JWT_SECRET,
+    hasMongoURI: !!process.env.MONGO_URI,
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Start server
@@ -215,7 +240,10 @@ app.post("/check-username", async (req, res) => {
 // ROUTES
 app.post("/signup", async (req, res) => {
   const { name, email, password, phone } = req.body;
+  console.log("Signup attempt:", { name, email, phone, password: "***" }); // Debug log
+  
   if (!name || !email || !password || !phone) {
+    console.log("Missing fields:", { name: !!name, email: !!email, password: !!password, phone: !!phone });
     return res
       .status(400)
       .json({ success: false, error: "All fields are required" });
@@ -236,6 +264,7 @@ app.post("/signup", async (req, res) => {
 
     const user = new User({ name, email, password, phone });
     await user.save();
+    console.log("User created successfully:", { id: user._id, name: user.name, email: user.email });
 
     // Send welcome email
     try {
@@ -317,8 +346,9 @@ app.post("/signup", async (req, res) => {
     }
 
     const token = require("./utils/generateToken")(user._id);
+    console.log("Token generated:", token ? "Success" : "Failed"); // Debug log
 
-    res.json({
+    const responseData = {
       success: true,
       token,
       user: {
@@ -328,7 +358,10 @@ app.post("/signup", async (req, res) => {
         phone: user.phone,
         role: user.role,
       },
-    });
+    };
+    
+    console.log("Sending signup response:", { success: responseData.success, userId: responseData.user.id }); // Debug log
+    res.json(responseData);
   } catch (err) {
     console.error("Signup error:", err);
     res.status(500).json({ success: false, error: "Server error" });
@@ -355,9 +388,19 @@ app.post("/login", async (req, res) => {
         : "No user found"
     ); // Debug log
 
-    if (!user || !(await user.matchPassword(password))) {
+    if (!user) {
+      console.log("User not found for identifier:", identifier);
+      return res.status(401).json({ success: false, error: "Invalid credentials" });
+    }
+
+    const passwordMatch = await user.matchPassword(password);
+    console.log("Password comparison result:", passwordMatch); // Debug log
+    console.log("Stored password:", user.password); // Debug log
+    console.log("Entered password:", password); // Debug log
+
+    if (!passwordMatch) {
       console.log("Password match failed"); // Debug log
-      return res.status(401).json({ error: "Invalid credentials" });
+      return res.status(401).json({ success: false, error: "Invalid credentials" });
     }
 
     const token = require("./utils/generateToken")(user._id);
@@ -375,7 +418,7 @@ app.post("/login", async (req, res) => {
     });
   } catch (err) {
     console.error("Login error:", err);
-    res.status(500).json({ error: "Server error" });
+    res.status(500).json({ success: false, error: "Server error" });
   }
 });
 
