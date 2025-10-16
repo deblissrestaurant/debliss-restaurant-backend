@@ -18,7 +18,6 @@
   "license": "ISC",
   "dependencies": {
     "@dotenvx/dotenvx": "^1.47.5",
-    "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",

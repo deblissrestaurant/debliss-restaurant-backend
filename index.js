@@ -100,7 +100,6 @@ mongoose
   .catch((err) => console.error("MongoDB error:", err));
 
 // SCHEMAS
-const bcrypt = require("bcryptjs");
 
 const userSchema = new mongoose.Schema({
   name: String,
@@ -112,13 +111,7 @@ const userSchema = new mongoose.Schema({
   resetTokenExpiry: Date,
 });
 
-// Password hashing removed - passwords are now stored as plain text
-// userSchema.pre("save", async function (next) {
-//   if (!this.isModified("password")) return next();
-//   this.password = await bcrypt.hash(this.password, 10);
-//   next();
-// });
-// Method to compare password - now compares plain text passwords
+// Passwords are stored as plain text (no hashing)
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return enteredPassword === this.password;
 };
@@ -433,7 +426,7 @@ app.post("/reset-password", async (req, res) => {
       return res.status(400).json({ error: "Invalid or expired token." });
     }
 
-    user.password = newPassword; // This will be hashed in pre("save")
+    user.password = newPassword; // Stored as plain text
     user.resetToken = null;
     user.resetTokenExpires = null;
     await user.save();
@@ -1247,11 +1240,11 @@ app.post("/admin/create-user", async (req, res) => {
         .json({ success: false, error: "User already exists" });
     }
 
-    // Create and save new user (password will be hashed by pre-save hook)
+    // Create and save new user (password stored as plain text)
     const newUser = new User({
       name,
       email,
-      password, // Don't hash here - let the pre-save hook handle it
+      password, // Stored as plain text
       phone,
       role, // "admin" or "rider"
     });
