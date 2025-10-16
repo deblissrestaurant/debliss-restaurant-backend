@@ -46,20 +46,23 @@ app.listen(PORT, () => {
   console.log(`Backend running on port ${PORT}`);
 });
 
-// Self-ping every 10 minutes to prevent Render from spinning down
-const pingUrl = `https://debliss-restaurant-backend.onrender.com/health`;
+
+// -------------------- KEEP ALIVE (Render Auto Sleep Prevention) --------------------
+const URLS = [
+  'https://debliss-restaurant-backend.onrender.com',
+  'https://debliss-restaurant.onrender.com',
+];
+
 setInterval(async () => {
-  try {
-    const res = await fetch(pingUrl);
-    if (res.ok) {
-      console.log(`[Self-ping] Server alive at ${new Date().toLocaleTimeString()}`);
-    } else {
-      console.log(`[Self-ping] Ping failed with status: ${res.status}`);
+  for (const url of URLS) {
+    try {
+      const res = await fetch(url);
+      console.log(`[${new Date().toISOString()}] Pinged ${url} → ${res.status}`);
+    } catch (err) {
+      console.error(`[${new Date().toISOString()}] Error pinging ${url}:`, err.message);
     }
-  } catch (err) {
-    console.error("[Self-ping] Error:", err);
   }
-}, 600000); // 600,000 ms = 10 minutes
+}, 10 * 60 * 1000); // every 10 minutes
 
 
 
