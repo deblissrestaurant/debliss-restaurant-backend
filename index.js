@@ -11,7 +11,7 @@ const app = express();
 
 // CORS configuration for production
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: process.env.FRONTEND_URL || 'https://debliss-restaurant.onrender.com',
   credentials: true,
   optionsSuccessStatus: 200
 };
