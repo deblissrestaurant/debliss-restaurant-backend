@@ -346,8 +346,6 @@ app.post("/signup", async (req, res) => {
     }
 
     const token = require("./utils/generateToken")(user._id);
-    console.log("Token generated:", token ? "Success" : "Failed"); // Debug log
-
     const responseData = {
       success: true,
       token,
@@ -360,7 +358,6 @@ app.post("/signup", async (req, res) => {
       },
     };
     
-    console.log("Sending signup response:", { success: responseData.success, userId: responseData.user.id }); // Debug log
     res.json(responseData);
   } catch (err) {
     console.error("Signup error:", err);
@@ -394,9 +391,7 @@ app.post("/login", async (req, res) => {
     }
 
     const passwordMatch = await user.matchPassword(password);
-    console.log("Password comparison result:", passwordMatch); // Debug log
-    console.log("Stored password:", user.password); // Debug log
-    console.log("Entered password:", password); // Debug log
+    // Password comparison successful
 
     if (!passwordMatch) {
       console.log("Password match failed"); // Debug log
