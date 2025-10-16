@@ -6,8 +6,39 @@ const cron = require("node-cron");
 // Load environment variables
 require('dotenv').config({ path: __dirname + '/.env' });
 
+import express from "express";
+import fetch from "node-fetch"; // npm install node-fetch
 
 const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Example /health route
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`Backend running on port ${PORT}`);
+});
+
+// Self-ping every 10 minutes to prevent Render from spinning down
+const pingUrl = `https://debliss-restaurant-backend.onrender.com/health`;
+setInterval(async () => {
+  try {
+    const res = await fetch(pingUrl);
+    if (res.ok) {
+      console.log(`[Self-ping] Server alive at ${new Date().toLocaleTimeString()}`);
+    } else {
+      console.log(`[Self-ping] Ping failed with status: ${res.status}`);
+    }
+  } catch (err) {
+    console.error("[Self-ping] Error:", err);
+  }
+}, 600000); // 600,000 ms = 10 minutes
+
+
+
 
 // CORS configuration for production
 const corsOptions = {
@@ -82,14 +113,15 @@ const userSchema = new mongoose.Schema({
   resetTokenExpiry: Date,
 });
 
-userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
-  this.password = await bcrypt.hash(this.password, 10);
-  next();
-});
-// Method to compare password
+// Password hashing removed - passwords are now stored as plain text
+// userSchema.pre("save", async function (next) {
+//   if (!this.isModified("password")) return next();
+//   this.password = await bcrypt.hash(this.password, 10);
+//   next();
+// });
+// Method to compare password - now compares plain text passwords
 userSchema.methods.matchPassword = async function (enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
+  return enteredPassword === this.password;
 };
 
 const User = mongoose.model("User", userSchema);
