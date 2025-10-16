@@ -16,7 +16,6 @@
   ],
   "author": "",
   "license": "ISC",
-  "type": "module",
   "dependencies": {
     "@dotenvx/dotenvx": "^1.47.5",
     "bcryptjs": "^3.0.2",

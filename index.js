@@ -6,7 +6,7 @@ const cron = require("node-cron");
 // Load environment variables
 require('dotenv').config({ path: __dirname + '/.env' });
 
-import fetch from "node-fetch"; // npm install node-fetch
+const fetch = require("node-fetch"); // npm install node-fetch
 
 const app = express();
 const PORT = process.env.PORT || 3000;
