@@ -220,8 +220,6 @@ app.post("/check-username", async (req, res) => {
 });
 
 // ROUTES
-const bcrypt = require("bcryptjs");
-const sendEmail = require("./utils/sendEmail");
 const generateToken = require("./utils/generateToken");
 
 app.post("/signup", async (req, res) => {
