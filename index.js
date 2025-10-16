@@ -3,6 +3,16 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const cron = require("node-cron");
 
+const uri = process.env.MONGO_URI || "mongodb+srv://DeBliss:RcmplIx9ocZSfkbk@cluster0.zl0of1q.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+
+mongoose.connect(uri)
+  .then(() => {
+    console.log("MongoDB connected");
+    app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
+  })
+  .catch(err => console.error("MongoDB error:", err));
+
+
 // Load environment variables
 require('dotenv').config({ path: __dirname + '/.env' });
 
@@ -21,7 +31,6 @@ if (!process.env.MONGO_URI) {
 
 console.log("✅ Environment variables loaded successfully");
 
-const fetch = require("node-fetch"); // npm install node-fetch
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -40,32 +49,6 @@ app.get("/test-auth", (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
-
-// Start server
-app.listen(PORT, () => {
-  console.log(`Backend running on port ${PORT}`);
-});
-
-
-// -------------------- KEEP ALIVE (Render Auto Sleep Prevention) --------------------
-const URLS = [
-  'https://debliss-restaurant-backend.onrender.com',
-  'https://debliss-restaurant.onrender.com',
-];
-
-setInterval(async () => {
-  for (const url of URLS) {
-    try {
-      const res = await fetch(url);
-      console.log(`[${new Date().toISOString()}] Pinged ${url} → ${res.status}`);
-    } catch (err) {
-      console.error(`[${new Date().toISOString()}] Error pinging ${url}:`, err.message);
-    }
-  }
-}, 10 * 60 * 1000); // every 10 minutes
-
-
-
 
 // CORS configuration for production
 const corsOptions = {
@@ -121,11 +104,7 @@ const FinishedDelivery = mongoose.model(
 );
 
 const RiderFinishedDelivery = require("./models/RiderFinishedDelivery");
-const uri = process.env.MONGO_URI || "mongodb+srv://DeBliss:RcmplIx9ocZSfkbk@cluster0.zl0of1q.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-mongoose
-  .connect(uri)
-  .then(() => console.log("MongoDB connected"))
-  .catch((err) => console.error("MongoDB error:", err));
+
 
 // SCHEMAS
 
@@ -241,115 +220,50 @@ app.post("/check-username", async (req, res) => {
 });
 
 // ROUTES
+const bcrypt = require("bcryptjs");
+const sendEmail = require("./utils/sendEmail");
+const generateToken = require("./utils/generateToken");
+
 app.post("/signup", async (req, res) => {
-  const { name, email, password, phone } = req.body;
-  console.log("Signup attempt:", { name, email, phone, password: "***" }); // Debug log
-  
-  if (!name || !email || !password || !phone) {
-    console.log("Missing fields:", { name: !!name, email: !!email, password: !!password, phone: !!phone });
-    return res
-      .status(400)
-      .json({ success: false, error: "All fields are required" });
-  }
   try {
-    // Check for existing users (case-insensitive)
-    const existing = await User.findOne({
+    const { name, email, password, phone } = req.body;
+    console.log("Signup attempt:", { name, email, phone, password: "***" });
+
+    // ✅ Validate required fields
+    if (!name || !email || !password || !phone) {
+      return res
+        .status(400)
+        .json({ success: false, error: "All fields are required" });
+    }
+
+    // ✅ Ensure username and email are unique
+    const existingUser = await User.findOne({
       $or: [
         { email: { $regex: new RegExp("^" + email + "$", "i") } },
         { name: { $regex: new RegExp("^" + name + "$", "i") } },
       ],
     });
-    if (existing) {
+    if (existingUser) {
+      const field = existingUser.email.toLowerCase() === email.toLowerCase()
+        ? "Email"
+        : "Username";
       return res
         .status(409)
-        .json({ success: false, error: "User already exists" });
+        .json({ success: false, error: `${field} already in use` });
     }
 
     const user = new User({ name, email, password, phone });
     await user.save();
-    console.log("User created successfully:", { id: user._id, name: user.name, email: user.email });
 
-    // Send welcome email
-    try {
-      const sendEmail = require("./utils/sendEmail");
-      const welcomeEmailHtml = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 20px; }
-            .container { max-width: 600px; margin: 0 auto; background-color: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
-            .header { background: linear-gradient(135deg, #ff1200, #ff4000); color: white; padding: 30px; text-align: center; }
-            .header h1 { margin: 0; font-size: 32px; font-weight: bold; }
-            .header p { margin: 10px 0 0 0; font-size: 16px; opacity: 0.9; }
-            .content { padding: 40px 30px; }
-            .content h2 { color: #333; margin-bottom: 20px; font-size: 24px; }
-            .content p { color: #666; line-height: 1.6; margin-bottom: 20px; }
-            .features { background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
-            .features h3 { color: #ff1200; margin-bottom: 15px; }
-            .features ul { margin: 0; padding-left: 20px; }
-            .features li { color: #555; margin-bottom: 8px; }
-            .cta { text-align: center; margin: 30px 0; }
-            .cta a { background: linear-gradient(135deg, #ff1200, #ff4000); color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block; }
-            .footer { background-color: #333; color: white; text-align: center; padding: 20px; }
-            .footer p { margin: 5px 0; font-size: 14px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>Welcome to DE BLISS!</h1>
-              <p>Serving love in every dish</p>
-            </div>
-            <div class="content">
-              <h2>Hello ${name}! 👋</h2>
-              <p>Welcome to the DE BLISS family! We're thrilled to have you join our community of food lovers who appreciate authentic flavors and exceptional dining experiences.</p>
-              
-              <div class="features">
-                <h3>What you can do with your account:</h3>
-                <ul>
-                  <li>🍽️ Browse our signature menu with 50+ delicious dishes</li>
-                  <li>🛒 Place orders for delivery or pickup</li>
-                  <li>📅 Make table reservations for special occasions</li>
-                  <li>⭐ Rate and review your favorite meals</li>
-                  <li>🎁 Get exclusive offers and early access to new dishes</li>
-                  <li>📱 Enjoy our mobile-optimized ordering experience</li>
-                </ul>
-              </div>
-              
-              <p>Our team of passionate chefs is ready to serve you authentic Ghanaian cuisine made with the finest ingredients and lots of love.</p>
-              
-              <div class="cta">
-                <a href="https://deblissfh.me">Start Ordering Now</a>
-              </div>
-              
-              <p>If you have any questions or need assistance, feel free to reach out to our friendly customer support team.</p>
-              
-              <p>Thank you for choosing DE BLISS. We can't wait to serve you!</p>
-            </div>
-            <div class="footer">
-              <p><strong>DE BLISS Restaurant</strong></p>
-              <p>Serving 10K+ happy customers with love and tradition</p>
-              <p>Contact us: debliss2024@gmail.com | Phone: +233 25 628 6634</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `;
+    console.log("✅ User created successfully:", {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+    });
 
-      await sendEmail(
-        email,
-        "🎉 Welcome to DE BLISS - Your culinary journey begins!",
-        welcomeEmailHtml
-      );
-      console.log(`Welcome email sent to ${email}`);
-    } catch (emailError) {
-      console.error("Failed to send welcome email:", emailError);
-      // Don't fail the registration if email fails
-    }
-
-    const token = require("./utils/generateToken")(user._id);
-    const responseData = {
+    // ✅ Generate token and send response immediately (fast signup)
+    const token = generateToken(user._id);
+    res.json({
       success: true,
       token,
       user: {
@@ -359,14 +273,86 @@ app.post("/signup", async (req, res) => {
         phone: user.phone,
         role: user.role,
       },
-    };
-    
-    res.json(responseData);
+    });
+
+    // ✅ Send welcome email asynchronously (non-blocking)
+    setTimeout(async () => {
+      try {
+        const welcomeEmailHtml = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 20px; }
+              .container { max-width: 600px; margin: 0 auto; background-color: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+              .header { background: linear-gradient(135deg, #ff1200, #ff4000); color: white; padding: 30px; text-align: center; }
+              .header h1 { margin: 0; font-size: 32px; font-weight: bold; }
+              .header p { margin: 10px 0 0 0; font-size: 16px; opacity: 0.9; }
+              .content { padding: 40px 30px; }
+              .content h2 { color: #333; margin-bottom: 20px; font-size: 24px; }
+              .content p { color: #666; line-height: 1.6; margin-bottom: 20px; }
+              .features { background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
+              .features h3 { color: #ff1200; margin-bottom: 15px; }
+              .features ul { margin: 0; padding-left: 20px; }
+              .features li { color: #555; margin-bottom: 8px; }
+              .cta { text-align: center; margin: 30px 0; }
+              .cta a { background: linear-gradient(135deg, #ff1200, #ff4000); color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block; }
+              .footer { background-color: #333; color: white; text-align: center; padding: 20px; }
+              .footer p { margin: 5px 0; font-size: 14px; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1>Welcome to DE BLISS!</h1>
+                <p>Serving love in every dish</p>
+              </div>
+              <div class="content">
+                <h2>Hello ${name}! 👋</h2>
+                <p>Welcome to the DE BLISS family! We're thrilled to have you join our community of food lovers who appreciate authentic flavors and exceptional dining experiences.</p>
+                <div class="features">
+                  <h3>What you can do with your account:</h3>
+                  <ul>
+                    <li>🍽️ Browse our signature menu with 50+ delicious dishes</li>
+                    <li>🛒 Place orders for delivery or pickup</li>
+                    <li>📅 Make table reservations for special occasions</li>
+                    <li>⭐ Rate and review your favorite meals</li>
+                    <li>🎁 Get exclusive offers and early access to new dishes</li>
+                    <li>📱 Enjoy our mobile-optimized ordering experience</li>
+                  </ul>
+                </div>
+                <p>Our team of passionate chefs is ready to serve you authentic Ghanaian cuisine made with the finest ingredients and lots of love.</p>
+                <div class="cta">
+                  <a href="https://deblissfh.me">Start Ordering Now</a>
+                </div>
+                <p>If you have any questions or need assistance, feel free to reach out to our friendly customer support team.</p>
+                <p>Thank you for choosing DE BLISS. We can't wait to serve you!</p>
+              </div>
+              <div class="footer">
+                <p><strong>DE BLISS Restaurant</strong></p>
+                <p>Serving 10K+ happy customers with love and tradition</p>
+                <p>Contact us: debliss2024@gmail.com | Phone: +233 25 628 6634</p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `;
+        await sendEmail(
+          email,
+          "🎉 Welcome to DE BLISS - Your culinary journey begins!",
+          welcomeEmailHtml
+        );
+        console.log(`Welcome email sent to ${email}`);
+      } catch (emailError) {
+        console.error("❌ Failed to send welcome email:", emailError.message);
+      }
+    }, 0);
   } catch (err) {
-    console.error("Signup error:", err);
+    console.error("❌ Signup error:", err.message);
     res.status(500).json({ success: false, error: "Server error" });
   }
 });
+
 
 app.post("/login", async (req, res) => {
   const { identifier, password } = req.body;
@@ -2219,3 +2205,37 @@ app.get("/", (req, res) => {
 app.listen(3000, "0.0.0.0", () => {
   console.log("Backend running");
 });
+
+// -------------------- KEEP ALIVE (Render Auto Sleep Prevention) --------------------
+
+// Dynamic import for node-fetch (works in CommonJS)
+const fetch = (...args) =>
+  import("node-fetch").then(({ default: fetch }) => fetch(...args));
+
+const PING_URLS = [
+  "https://debliss-restaurant-backend.onrender.com/health", // backend health route
+  "https://debliss-restaurant.onrender.com"                 // frontend URL (optional)
+];
+
+// Ping interval (every 10 minutes)
+const PING_INTERVAL = 10 * 60 * 1000;
+
+// Start ping service 10 seconds after app boots
+setTimeout(() => {
+  console.log("⏱️ Keep-alive service started.");
+
+  setInterval(async () => {
+    for (const url of PING_URLS) {
+      try {
+        const res = await fetch(url);
+        console.log(
+          `[${new Date().toISOString()}] ✅ Pinged ${url} → ${res.status}`
+        );
+      } catch (err) {
+        console.error(
+          `[${new Date().toISOString()}] ❌ Ping failed for ${url}: ${err.message}`
+        );
+      }
+    }
+  }, PING_INTERVAL);
+}, 10 * 1000);
